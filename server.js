@@ -1,196 +1,88 @@
-const http = require('http');
-const { WebSocketServer } = require('ws');
+const http = require("http");
+const { WebSocketServer } = require("ws");
 
 const PORT = process.env.PORT || 3000;
-
-// HTTP server (Railway needs this to stay alive)
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('AGIIRISCHAT OK');
-});
-
-// WebSocket server attached to HTTP server
-const wss = new WebSocketServer({ server });
-
 const rooms = {};
 
-function broadcast(roomId, msg, excludeId = null) {
-  const room = rooms[roomId];
-  if (!room) return;
-  const data = JSON.stringify(msg);
-  for (const [id, client] of Object.entries(room)) {
-    if (id !== excludeId && client.ws.readyState === 1) {
-      client.ws.send(data);
-    }
-  }
-}
+const server = http.createServer(function(req, res) {
+  res.writeHead(200);
+  res.end("OK");
+});
 
-function getRoomMembers(roomId) {
-  return Object.entries(rooms[roomId] || {}).map(([id, c]) => ({ id, name: c.name }));
-}
+const wss = new WebSocketServer({ server: server });
 
-wss.on('connection', (ws) => {
-  let clientId = null, clientRoom = null, clientName = null;
+wss.on("connection", function(ws) {
+  var clientId = null;
+  var clientRoom = null;
+  var clientName = null;
 
-  ws.on('message', (raw) => {
-    let msg;
-    try { msg = JSON.parse(raw); } catch { return; }
+  ws.on("message", function(raw) {
+    var msg;
+    try { msg = JSON.parse(raw); } catch(e) { return; }
 
-    switch (msg.type) {
-      case 'join': {
-        clientId = msg.id;
-        clientRoom = msg.room;
-        clientName = msg.name;
-        if (!rooms[clientRoom]) rooms[clientRoom] = {};
-        rooms[clientRoom][clientId] = { ws, name: clientName };
-        ws.send(JSON.stringify({
-          type: 'room_members',
-          members: getRoomMembers(clientRoom).filter(m => m.id !== clientId)
-        }));
-        broadcast(clientRoom, { type: 'peer_joined', id: clientId, name: clientName }, clientId);
-        console.log(`[+] ${clientName} joined "${clientRoom}"`);
-        break;
-      }
-      case 'leave': {
-        if (clientRoom && rooms[clientRoom]) {
-          delete rooms[clientRoom][clientId];
-          broadcast(clientRoom, { type: 'peer_left', id: clientId, name: clientName });
-          if (Object.keys(rooms[clientRoom]).length === 0) delete rooms[clientRoom];
+    if (msg.type === "join") {
+      clientId = msg.id;
+      clientRoom = msg.room;
+      clientName = msg.name;
+      if (!rooms[clientRoom]) rooms[clientRoom] = {};
+      rooms[clientRoom][clientId] = { ws: ws, name: clientName };
+      var others = [];
+      Object.keys(rooms[clientRoom]).forEach(function(id) {
+        if (id !== clientId) others.push({ id: id, name: rooms[clientRoom][id].name });
+      });
+      ws.send(JSON.stringify({ type: "room_members", members: others }));
+      broadcast(clientRoom, { type: "peer_joined", id: clientId, name: clientName }, clientId);
+
+    } else if (msg.type === "leave") {
+      leave();
+
+    } else if (msg.type === "chat") {
+      broadcast(clientRoom, { type: "chat", id: clientId, name: clientName, text: msg.text }, clientId);
+
+    } else if (msg.type === "speaking") {
+      broadcast(clientRoom, { type: "speaking", id: clientId, speaking: msg.speaking }, clientId);
+
+    } else if (msg.type === "photo") {
+      broadcast(clientRoom, { type: "photo", id: clientId, name: clientName, data: msg.data }, clientId);
+
+    } else if (msg.type === "location") {
+      broadcast(clientRoom, { type: "location", id: clientId, name: clientName, lat: msg.lat, lng: msg.lng }, clientId);
+
+    } else if (msg.type === "offer" || msg.type === "answer" || msg.type === "ice") {
+      if (rooms[clientRoom] && rooms[clientRoom][msg.target]) {
+        var t = rooms[clientRoom][msg.target];
+        if (t.ws.readyState === 1) {
+          msg.from = clientId;
+          t.ws.send(JSON.stringify(msg));
         }
-        break;
-      }
-      case 'chat':
-        broadcast(clientRoom, { type: 'chat', id: clientId, name: clientName, text: msg.text }, clientId);
-        break;
-      case 'speaking':
-        broadcast(clientRoom, { type: 'speaking', id: clientId, speaking: msg.speaking }, clientId);
-        break;
-      case 'photo':
-        broadcast(clientRoom, { type: 'photo', id: clientId, name: clientName, data: msg.data, mime: msg.mime }, clientId);
-        break;
-      case 'location':
-        broadcast(clientRoom, { type: 'location', id: clientId, name: clientName, lat: msg.lat, lng: msg.lng }, clientId);
-        break;
-      case 'offer':
-      case 'answer':
-      case 'ice': {
-        const target = rooms[clientRoom]?.[msg.target];
-        if (target && target.ws.readyState === 1) {
-          target.ws.send(JSON.stringify({ ...msg, from: clientId }));
-        }
-        break;
       }
     }
   });
 
-  ws.on('close', () => {
+  ws.on("close", function() {
+    leave();
+  });
+
+  function leave() {
     if (clientRoom && rooms[clientRoom] && clientId) {
       delete rooms[clientRoom][clientId];
-      broadcast(clientRoom, { type: 'peer_left', id: clientId, name: clientName });
+      broadcast(clientRoom, { type: "peer_left", id: clientId, name: clientName });
       if (Object.keys(rooms[clientRoom]).length === 0) delete rooms[clientRoom];
-      console.log(`[x] ${clientName} disconnected`);
-    }
-  });
-});
-
-server.listen(PORT, () => {
-  console.log(`📡 AGIIRISCHAT server running on port ${PORT}`);
-});
-const http = require('http');
-const { WebSocketServer } = require('ws');
-
-const PORT = process.env.PORT || 3000;
-
-// HTTP server (Railway needs this to stay alive)
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('AGIIRISCHAT OK');
-});
-
-// WebSocket server attached to HTTP server
-const wss = new WebSocketServer({ server });
-
-const rooms = {};
-
-function broadcast(roomId, msg, excludeId = null) {
-  const room = rooms[roomId];
-  if (!room) return;
-  const data = JSON.stringify(msg);
-  for (const [id, client] of Object.entries(room)) {
-    if (id !== excludeId && client.ws.readyState === 1) {
-      client.ws.send(data);
     }
   }
-}
-
-function getRoomMembers(roomId) {
-  return Object.entries(rooms[roomId] || {}).map(([id, c]) => ({ id, name: c.name }));
-}
-
-wss.on('connection', (ws) => {
-  let clientId = null, clientRoom = null, clientName = null;
-
-  ws.on('message', (raw) => {
-    let msg;
-    try { msg = JSON.parse(raw); } catch { return; }
-
-    switch (msg.type) {
-      case 'join': {
-        clientId = msg.id;
-        clientRoom = msg.room;
-        clientName = msg.name;
-        if (!rooms[clientRoom]) rooms[clientRoom] = {};
-        rooms[clientRoom][clientId] = { ws, name: clientName };
-        ws.send(JSON.stringify({
-          type: 'room_members',
-          members: getRoomMembers(clientRoom).filter(m => m.id !== clientId)
-        }));
-        broadcast(clientRoom, { type: 'peer_joined', id: clientId, name: clientName }, clientId);
-        console.log(`[+] ${clientName} joined "${clientRoom}"`);
-        break;
-      }
-      case 'leave': {
-        if (clientRoom && rooms[clientRoom]) {
-          delete rooms[clientRoom][clientId];
-          broadcast(clientRoom, { type: 'peer_left', id: clientId, name: clientName });
-          if (Object.keys(rooms[clientRoom]).length === 0) delete rooms[clientRoom];
-        }
-        break;
-      }
-      case 'chat':
-        broadcast(clientRoom, { type: 'chat', id: clientId, name: clientName, text: msg.text }, clientId);
-        break;
-      case 'speaking':
-        broadcast(clientRoom, { type: 'speaking', id: clientId, speaking: msg.speaking }, clientId);
-        break;
-      case 'photo':
-        broadcast(clientRoom, { type: 'photo', id: clientId, name: clientName, data: msg.data, mime: msg.mime }, clientId);
-        break;
-      case 'location':
-        broadcast(clientRoom, { type: 'location', id: clientId, name: clientName, lat: msg.lat, lng: msg.lng }, clientId);
-        break;
-      case 'offer':
-      case 'answer':
-      case 'ice': {
-        const target = rooms[clientRoom]?.[msg.target];
-        if (target && target.ws.readyState === 1) {
-          target.ws.send(JSON.stringify({ ...msg, from: clientId }));
-        }
-        break;
-      }
-    }
-  });
-
-  ws.on('close', () => {
-    if (clientRoom && rooms[clientRoom] && clientId) {
-      delete rooms[clientRoom][clientId];
-      broadcast(clientRoom, { type: 'peer_left', id: clientId, name: clientName });
-      if (Object.keys(rooms[clientRoom]).length === 0) delete rooms[clientRoom];
-      console.log(`[x] ${clientName} disconnected`);
-    }
-  });
 });
 
-server.listen(PORT, () => {
-  console.log(`📡 AGIIRISCHAT server running on port ${PORT}`);
+function broadcast(roomId, msg, excludeId) {
+  var room = rooms[roomId];
+  if (!room) return;
+  var data = JSON.stringify(msg);
+  Object.keys(room).forEach(function(id) {
+    if (id !== excludeId && room[id].ws.readyState === 1) {
+      room[id].ws.send(data);
+    }
+  });
+}
+
+server.listen(PORT, function() {
+  console.log("AGIIRISCHAT running on port " + PORT);
 });
