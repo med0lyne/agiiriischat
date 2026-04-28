@@ -200,8 +200,119 @@ header{
 .leg-member.sp{color:var(--green);border-color:rgba(52,211,153,0.25);}
 .leg-member.sp .leg-dot{background:var(--green);}
 
-/* Leaflet */
-.leaflet-control-zoom a{background:rgba(8,8,26,0.9)!important;color:var(--purple)!important;border-color:rgba(167,139,250,0.2)!important;}
+/* ══ SQUAD PANEL ══ */
+.squad-btn{
+  position:absolute;top:12px;right:12px;z-index:600;
+  width:38px;height:38px;border-radius:50%;
+  background:rgba(8,8,26,0.88);
+  border:1px solid rgba(167,139,250,0.3);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  transition:all .15s;pointer-events:all;
+  font-size:16px;
+}
+.squad-btn:hover{background:rgba(167,139,250,0.15);}
+.squad-btn .badge{
+  position:absolute;top:-4px;right:-4px;
+  background:var(--grad);color:#fff;
+  font-size:9px;font-weight:700;
+  width:16px;height:16px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--bg);
+}
+
+/* Panel overlay */
+.squad-overlay{
+  position:absolute;inset:0;z-index:700;
+  background:rgba(0,0,0,0);
+  pointer-events:none;
+  transition:background .25s;
+}
+.squad-overlay.open{background:rgba(0,0,0,0.4);pointer-events:all;}
+
+/* Slide-in panel */
+.squad-panel{
+  position:absolute;top:0;right:0;bottom:0;
+  width:260px;max-width:80%;
+  background:linear-gradient(180deg,#0f0f28 0%,#08081a 100%);
+  border-left:1px solid rgba(167,139,250,0.15);
+  display:flex;flex-direction:column;
+  transform:translateX(100%);
+  transition:transform .3s cubic-bezier(.32,1,.52,1);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  pointer-events:all;
+}
+.squad-overlay.open .squad-panel{transform:translateX(0);}
+
+.squad-header{
+  padding:16px 16px 12px;
+  padding-top:calc(16px + env(safe-area-inset-top,0px));
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.squad-title{
+  font-family:'Syne',sans-serif;font-weight:800;font-size:14px;
+  letter-spacing:.06em;background:var(--grad);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.squad-close{
+  width:28px;height:28px;border-radius:50%;
+  background:rgba(255,255,255,0.05);border:1px solid var(--border);
+  color:var(--text2);font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+
+.squad-list{flex:1;overflow-y:auto;padding:8px;}
+.squad-list::-webkit-scrollbar{width:0;}
+
+.squad-member{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 10px;border-radius:var(--radius-sm);
+  cursor:pointer;transition:background .15s;
+  margin-bottom:2px;
+}
+.squad-member:hover{background:rgba(167,139,250,0.08);}
+.squad-member:active{background:rgba(167,139,250,0.15);}
+.squad-member.no-loc{opacity:.5;cursor:default;}
+.squad-member.no-loc:hover{background:none;}
+
+.squad-av{
+  width:36px;height:36px;border-radius:50%;
+  background:var(--grad-soft);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:var(--purple);
+  border:1px solid rgba(167,139,250,0.25);
+  transition:all .2s;
+}
+.squad-member.sp .squad-av{
+  border-color:rgba(167,139,250,0.6);
+  box-shadow:0 0 12px rgba(167,139,250,0.3);
+}
+.squad-info{flex:1;min-width:0;}
+.squad-name{font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px;}
+.squad-status{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px;}
+.squad-status .dot{width:5px;height:5px;border-radius:50%;background:var(--text3);flex-shrink:0;}
+.squad-status.online .dot{background:var(--green);}
+.squad-status.speaking .dot{background:var(--purple);box-shadow:0 0 4px var(--purple);}
+.squad-status.has-loc .dot{background:var(--blue);}
+
+.squad-go{
+  width:28px;height:28px;border-radius:50%;
+  background:rgba(167,139,250,0.1);
+  border:1px solid rgba(167,139,250,0.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;flex-shrink:0;
+  transition:all .15s;
+}
+.squad-member:hover .squad-go{background:rgba(167,139,250,0.2);border-color:rgba(167,139,250,0.4);}
+.squad-member.no-loc .squad-go{display:none;}
+
+.squad-empty{padding:24px 16px;text-align:center;color:var(--text3);font-size:12px;line-height:1.6;}
+
+/* Meter moves left when squad btn visible */
+.map-meter{right:60px;}
+background:rgba(8,8,26,0.9)!important;color:var(--purple)!important;border-color:rgba(167,139,250,0.2)!important;}
 .leaflet-control-zoom a:hover{background:rgba(167,139,250,0.1)!important;}
 .leaflet-control-attribution{display:none;}
 .leaflet-control-zoom{margin-right:12px!important;margin-top:12px!important;}
@@ -376,6 +487,25 @@ header{
         <div class="mmbar" style="height:4px"></div><div class="mmbar" style="height:4px"></div>
         <div class="mmbar" style="height:4px"></div><div class="mmbar" style="height:4px"></div>
         <div class="mmbar" style="height:4px"></div><div class="mmbar" style="height:4px"></div>
+      </div>
+
+      <!-- Squad button -->
+      <button class="squad-btn" id="squadBtn" onclick="openSquad()" style="pointer-events:all">
+        👥
+        <div class="badge" id="squadBadge">0</div>
+      </button>
+
+      <!-- Squad panel -->
+      <div class="squad-overlay" id="squadOverlay" onclick="closeSquadOnBg(event)">
+        <div class="squad-panel" id="squadPanel">
+          <div class="squad-header">
+            <div class="squad-title">SQUAD</div>
+            <button class="squad-close" onclick="closeSquad()">✕</button>
+          </div>
+          <div class="squad-list" id="squadList">
+            <div class="squad-empty">Conecta para ver<br>a tu squad</div>
+          </div>
+        </div>
       </div>
       <div class="map-hud" style="pointer-events:all;">
         <div class="hud-card hud-legend" id="hudLegend" style="display:none">
@@ -600,6 +730,7 @@ function renderMembers(){
     return `<div class="leg-member${isSelf?' me':''}${m.speaking?' sp':''}"><div class="leg-dot"></div>${m.name}${isSelf?' ·tú':''}</div>`;
   }).join('');
   updateSpeakingIndicator();
+  updateSquadBadge();
 }
 
 function addMsg(name,text,type='text'){
@@ -655,10 +786,17 @@ function onLocUpdate(lat,lng){
   const now=Date.now();if(now-_lastSent>3000){_lastSent=now;send({type:'location',lat,lng});}
 }
 function updatePeerLoc(id,name,lat,lng){
-  if(lat===null){if(peerMarkers[id]){map.removeLayer(peerMarkers[id]);delete peerMarkers[id];}return;}
-  const icon=makeIcon(name,false);
-  if(!peerMarkers[id])peerMarkers[id]=L.marker([lat,lng],{icon}).addTo(map).bindPopup(name);
-  else peerMarkers[id].setLatLng([lat,lng]);
+  if(lat===null){
+    delete peerLocations[id];
+    if(peerMarkers[id]){map.removeLayer(peerMarkers[id]);delete peerMarkers[id];}
+  } else {
+    peerLocations[id]={lat,lng};
+    const icon=makeIcon(name,false);
+    if(!peerMarkers[id])peerMarkers[id]=L.marker([lat,lng],{icon}).addTo(map).bindPopup(name);
+    else peerMarkers[id].setLatLng([lat,lng]);
+  }
+  // Re-render squad panel if open
+  if($('squadOverlay').classList.contains('open'))renderSquad();
 }
 function makeIcon(name,self=false){
   const ini=name.slice(0,2).toUpperCase();
@@ -718,7 +856,7 @@ async function onMsg(data){
   switch(data.type){
     case 'room_members':for(const m of data.members){if(!members[m.id])members[m.id]={name:m.name,speaking:false};await initAudio();await createOffer(m.id);}renderMembers();break;
     case 'peer_joined':if(!members[data.id])members[data.id]={name:data.name,speaking:false};renderMembers();addMsg('sistema',`${data.name} se conectó`,'sys');break;
-    case 'peer_left':if(members[data.id]){addMsg('sistema',`${members[data.id].name} se desconectó`,'sys');delete members[data.id];renderMembers();}closePeer(data.id);if(peerMarkers[data.id]){map.removeLayer(peerMarkers[data.id]);delete peerMarkers[data.id];}break;
+    case 'peer_left':if(members[data.id]){addMsg('sistema',`${members[data.id].name} se desconectó`,'sys');delete members[data.id];renderMembers();}closePeer(data.id);delete peerLocations[data.id];if(peerMarkers[data.id]){map.removeLayer(peerMarkers[data.id]);delete peerMarkers[data.id];}break;
     case 'chat':addMsg(data.name,data.text);break;
     case 'speaking':if(members[data.id]){members[data.id].speaking=data.speaking;renderMembers();}break;
     case 'photo':addPhoto(data.name,data.data);break;
@@ -786,6 +924,54 @@ function doDisconnect(){
   $('wName').value=myName;$('wRoom').value=roomId;
   $('wJoinBtn').disabled=false;$('wJoinBtn').textContent='Entrar →';$('wError').textContent='';
   $('welcomeOverlay').classList.remove('hidden');
+}
+
+// ── Squad panel ────────────────────────────────────────────────────────────
+// Track peer locations for the squad panel
+const peerLocations = {}; // id -> {lat, lng}
+
+function openSquad(){ $('squadOverlay').classList.add('open'); renderSquad(); }
+function closeSquad(){ $('squadOverlay').classList.remove('open'); }
+function closeSquadOnBg(e){ if(e.target===$('squadOverlay'))closeSquad(); }
+
+function renderSquad(){
+  const list=$('squadList');
+  const ids=Object.keys(members).filter(id=>id!==myId);
+  if(!ids.length){list.innerHTML='<div class="squad-empty">Sala vacía —<br>espera a tus amigos</div>';return;}
+
+  list.innerHTML=ids.map(id=>{
+    const m=members[id];
+    const ini=m.name.slice(0,2).toUpperCase();
+    const hasLoc=!!peerLocations[id];
+    const isSpeaking=m.speaking;
+    const statusClass=isSpeaking?'speaking':hasLoc?'has-loc':'online';
+    const statusText=isSpeaking?'hablando...':hasLoc?'ubicación activa':'en espera';
+    const memberClass=hasLoc?'':'no-loc';
+    return `<div class="squad-member ${memberClass}${isSpeaking?' sp':''}" onclick="${hasLoc?`flyToMember('${id}')`:''}" >
+      <div class="squad-av">${ini}</div>
+      <div class="squad-info">
+        <div class="squad-name">${m.name}</div>
+        <div class="squad-status ${statusClass}"><div class="dot"></div>${statusText}</div>
+      </div>
+      ${hasLoc?'<div class="squad-go">→</div>':''}
+    </div>`;
+  }).join('');
+
+  // Update badge
+  const online=ids.length;
+  $('squadBadge').textContent=online>9?'9+':online;
+}
+
+function flyToMember(id){
+  const loc=peerLocations[id];
+  if(!loc||!map)return;
+  closeSquad();
+  map.flyTo([loc.lat,loc.lng],17,{animate:true,duration:1.2});
+}
+
+function updateSquadBadge(){
+  const online=Object.keys(members).filter(id=>id!==myId).length;
+  $('squadBadge').textContent=online>9?'9+':online;
 }
 
 function sendMsg(){const input=$('chatInput'),text=input.value.trim();if(!text||!connected)return;input.value='';addMsg(myName,text);send({type:'chat',text});}
