@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AGIIRISCHAT</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root {
+  --bg: #0e0e0e;
+  --surface: #161616;
+  --surface2: #1e1e1e;
+  --border: #2a2a2a;
+  --text: #f0f0f0;
+  --text2: #888;
+  --text3: #444;
+  --white: #ffffff;
+  --red: #ff4444;
+  --green: #4ade80;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; overflow:hidden; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+
+.logo {
+  font-family: 'DM Mono', monospace;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  color: var(--white);
+}
+
+.conn-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.conn-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text3);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.conn-dot.on { background: var(--green); box-shadow: 0 0 6px #4ade8066; }
+.conn-dot.spin { background: #facc15; animation: pulse 0.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── TABS ── */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  padding: 0 4px;
+  gap: 2px;
+  background: var(--bg);
+  z-index: 10;
+}
+
+.tab {
+  flex: 1;
+  padding: 11px 6px;
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s;
+  position: relative;
+  letter-spacing: 0.02em;
+}
+.tab.active { color: var(--white); }
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 14px; right: 14px;
+  height: 1px;
+  background: var(--white);
+  border-radius: 1px;
+}
+
+.tab-badge {
+  display: none;
+  position: absolute;
+  top: 6px; right: 6px;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+.tab-badge.show { display: flex; }
+
+/* ── PANELS ── */
+.panel { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+.panel.active { display: flex; }
+
+/* ── MAP PANEL (main) ── */
+.map-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  background: #111;
+}
+
+/* Map overlay cards */
+.map-overlay {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 32px);
+  max-width: 400px;
+  pointer-events: none;
+}
+
+.map-overlay > * { pointer-events: all; }
+
+.loc-card {
+  background: rgba(14,14,14,0.92);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.loc-status-text { flex: 1; font-size: 12px; color: var(--text2); }
+.loc-status-text strong { color: var(--text); font-weight: 500; display: block; margin-bottom: 1px; }
+
+.loc-toggle {
+  background: var(--white);
+  color: var(--bg);
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.loc-toggle:hover { opacity: 0.85; }
+.loc-toggle.on { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+.loc-toggle:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* member dots on map legend */
+.map-members-legend {
+  background: rgba(14,14,14,0.92);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  width: 100%;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.legend-title { font-size: 11px; color: var(--text3); margin-bottom: 6px; letter-spacing: 0.04em; }
+.legend-members { display: flex; flex-wrap: wrap; gap: 6px; }
+.legend-member {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--text2);
+  background: var(--surface2);
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+.legend-member.sp { color: var(--green); border-color: #4ade8033; }
+.legend-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+.legend-member.sp .legend-dot { background: var(--green); }
+.legend-member.me .legend-dot { background: var(--white); }
+.legend-member.me { color: var(--text); }
+
+/* ── CHAT PANEL ── */
+.chat-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.chat-area::-webkit-scrollbar { width: 0; }
+
+.msg { display: flex; gap: 10px; padding: 5px 0; animation: fadeUp 0.15s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+
+.msg.sys { justify-content: center; padding: 8px 0; }
+.sys-text {
+  font-size: 11px;
+  color: var(--text3);
+  background: var(--surface);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.msg-av {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600;
+  color: var(--text2);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.msg-body { flex: 1; }
+.msg-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+.msg-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.msg-time { font-size: 11px; color: var(--text3); }
+.msg-text { font-size: 14px; color: var(--text2); line-height: 1.5; word-break: break-word; }
+.voice-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text3);
+  background: var(--surface); padding: 4px 10px;
+  border-radius: 20px; border: 1px solid var(--border);
+}
+
+/* ── CONTROLS ── */
+.controls {
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 9px;
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+.ptt-row { display: flex; align-items: center; gap: 14px; }
+
+.ptt-btn {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  user-select: none;
+  transition: all 0.15s;
+  -webkit-user-select: none;
+}
+.ptt-btn:active, .ptt-btn.active {
+  background: var(--white); border-color: var(--white); color: var(--bg); transform: scale(0.95);
+}
+.ptt-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.ptt-info { flex: 1; }
+.ptt-label { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.ptt-sub { font-size: 11px; color: var(--text3); }
+.ptt-sub.tx { color: var(--red); }
+
+.meter { display: flex; gap: 2px; align-items: flex-end; height: 16px; }
+.mbar { width: 3px; background: var(--border); border-radius: 2px; transition: height 0.05s, background 0.05s; }
+.mbar.on { background: var(--white); }
+
+.input-row { display: flex; gap: 8px; }
+.ci {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); font-family: 'DM Sans', sans-serif;
+  font-size: 14px; padding: 10px 14px; border-radius: 24px; outline: none;
+}
+.ci:focus { border-color: #444; }
+.ci::placeholder { color: var(--text3); }
+.ci:disabled { opacity: 0.3; }
+
+.send-btn {
+  background: var(--white); border: none; color: var(--bg);
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+  padding: 10px 18px; border-radius: 24px; cursor: pointer; white-space: nowrap;
+}
+.send-btn:hover { opacity: 0.85; }
+.send-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+.duck-note { font-size: 11px; color: var(--text3); text-align: center; }
+.duck-note.on { color: var(--text2); }
+
+/* ── MEMBERS ── */
+.members-wrap { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.members-wrap::-webkit-scrollbar { width: 0; }
+
+.member {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: var(--radius-sm); transition: background 0.1s;
+}
+.member:hover { background: var(--surface); }
+.member.sp { background: var(--surface); }
+
+.m-av {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--surface2); display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600; color: var(--text2);
+  flex-shrink: 0; border: 1px solid var(--border); transition: border-color 0.2s;
+}
+.member.sp .m-av { border-color: var(--green); }
+
+.m-info { flex: 1; min-width: 0; }
+.m-name { font-size: 14px; font-weight: 500; color: var(--text); }
+.m-status { font-size: 12px; color: var(--text3); margin-top: 1px; }
+.member.sp .m-status { color: var(--green); }
+
+.m-wave { display: none; gap: 2px; align-items: flex-end; }
+.member.sp .m-wave { display: flex; }
+.wbar { width: 3px; background: var(--green); border-radius: 2px; animation: wv 0.5s ease-in-out infinite alternate; }
+.wbar:nth-child(1){height:4px;animation-delay:0s}
+.wbar:nth-child(2){height:8px;animation-delay:.15s}
+.wbar:nth-child(3){height:5px;animation-delay:.3s}
+@keyframes wv{from{transform:scaleY(.3)}to{transform:scaleY(1)}}
+
+/* ── JOIN FORM ── */
+.join-form {
+  padding: 14px 16px; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+}
+.field-group { display: flex; flex-direction: column; gap: 4px; }
+.field-label { font-size: 11px; color: var(--text3); letter-spacing: 0.04em; font-weight: 500; }
+.fi {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 10px 14px;
+  border-radius: var(--radius-sm); outline: none; width: 100%;
+}
+.fi:focus { border-color: #444; }
+.fi::placeholder { color: var(--text3); }
+.fi:disabled { opacity: 0.4; }
+.fi.mono { font-family: 'DM Mono', monospace; font-size: 13px; }
+
+.jbtn {
+  background: var(--white); color: var(--bg); border: none;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+  padding: 12px; border-radius: var(--radius-sm); cursor: pointer; margin-top: 4px;
+}
+.jbtn:hover { opacity: 0.85; }
+.jbtn.lv { background: var(--surface); color: var(--red); border: 1px solid var(--border); }
+.jbtn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── PHOTOS ── */
+.photos-topbar { padding: 12px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.upload-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text2);
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  padding: 8px 16px; border-radius: 24px; cursor: pointer;
+}
+.upload-btn:hover:not(:disabled) { border-color: #444; color: var(--text); }
+.upload-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+#photoFile { display: none; }
+
+.photos-area { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.photos-area::-webkit-scrollbar { width: 0; }
+
+.photo-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; animation: fadeUp 0.2s ease; }
+.photo-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.photo-av { width: 24px; height: 24px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: var(--text2); flex-shrink: 0; }
+.photo-name { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.photo-time { font-size: 11px; color: var(--text3); }
+.photo-img { width: 100%; display: block; max-height: 300px; object-fit: cover; cursor: pointer; }
+
+.photos-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--text3); }
+.photos-empty .icon { font-size: 28px; margin-bottom: 4px; opacity: 0.5; }
+.photos-empty p { font-size: 13px; }
+.photos-empty span { font-size: 12px; opacity: 0.6; }
+
+/* lightbox */
+.lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9999; align-items: center; justify-content: center; padding: 20px; }
+.lightbox.open { display: flex; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: var(--radius); object-fit: contain; }
+.lb-close { position: absolute; top: 16px; right: 16px; background: var(--surface); border: 1px solid var(--border); color: var(--text2); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+
+/* empty state */
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--text3); padding: 40px; }
+.empty-state .icon { font-size: 28px; margin-bottom: 6px; opacity: 0.5; }
+.empty-state p { font-size: 13px; text-align: center; line-height: 1.6; }
+
+/* leaflet dark overrides */
+.leaflet-tile-pane { filter: brightness(0.85) contrast(1.1); }
+.leaflet-popup-content-wrapper { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: none; }
+.leaflet-popup-tip { background: var(--surface); }
+.leaflet-popup-content { margin: 10px 14px; font-family: 'DM Sans', sans-serif; font-size: 13px; }
+.leaflet-control-zoom a { background: var(--surface) !important; color: var(--text2) !important; border-color: var(--border) !important; }
+.leaflet-control-zoom a:hover { background: var(--surface2) !important; color: var(--text) !important; }
+.leaflet-control-attribution { display: none; }
+
+* { scrollbar-width: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">agiirischat</div>
+  <div class="conn-pill">
+    <div class="conn-dot" id="cDot"></div>
+    <span id="cLabel">offline</span>
+    <span id="rLabel" style="display:none; margin-left:2px; color:#555"></span>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('map')" id="tab-map">🗺 Mapa</button>
+  <button class="tab" onclick="switchTab('chat')" id="tab-chat">
+    Chat
+    <span class="tab-badge" id="badge-chat"></span>
+  </button>
+  <button class="tab" onclick="switchTab('members')" id="tab-members">Grupo</button>
+  <button class="tab" onclick="switchTab('photos')" id="tab-photos">
+    Fotos
+    <span class="tab-badge" id="badge-photos"></span>
+  </button>
+</div>
+
+<!-- ── MAP (MAIN) ── -->
+<div class="panel active" id="panel-map" style="flex-direction:column">
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-overlay">
+      <!-- legend -->
+      <div class="map-members-legend" id="mapLegend" style="display:none">
+        <div class="legend-title">EN LÍNEA</div>
+        <div class="legend-members" id="legendMembers"></div>
+      </div>
+      <!-- location card -->
+      <div class="loc-card">
+        <div class="loc-status-text">
+          <strong id="locTitle">Ubicación desactivada</strong>
+          <span id="locSub">Activa para compartir con tu squad</span>
+        </div>
+        <button class="loc-toggle" id="locToggle" onclick="toggleLocation()" disabled>Activar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CHAT ── -->
+<div class="panel" id="panel-chat">
+  <div class="chat-area" id="chatArea">
+    <div class="msg sys"><span class="sys-text">agiirischat</span></div>
+  </div>
+  <div class="controls">
+    <div class="ptt-row">
+      <button class="ptt-btn" id="pttBtn" disabled>🎙</button>
+      <div class="ptt-info">
+        <div class="ptt-label">Push to talk</div>
+        <div class="ptt-sub" id="pttSub">Mantén pulsado · Spacebar</div>
+      </div>
+      <div class="meter" id="meter">
+        <div class="mbar" style="height:4px"></div>
+        <div class="mbar" style="height:4px"></div>
+        <div class="mbar" style="height:4px"></div>
+        <div class="mbar" style="height:4px"></div>
+        <div class="mbar" style="height:4px"></div>
+        <div class="mbar" style="height:4px"></div>
+        <div class="mbar" style="height:4px"></div>
+        <div class="mbar" style="height:4px"></div>
+      </div>
+    </div>
+    <div class="input-row">
+      <input class="ci" id="chatInput" placeholder="Escribe un mensaje..." disabled
+        onkeydown="if(event.key==='Enter')sendMsg()">
+      <button class="send-btn" id="sendBtn" disabled onclick="sendMsg()">Enviar</button>
+    </div>
+    <div class="duck-note" id="duck">🎵 Spotify sigue sonando mientras hablas</div>
+  </div>
+</div>
+
+<!-- ── MEMBERS ── -->
+<div class="panel" id="panel-members" style="flex-direction:column">
+  <div class="members-wrap" id="membersList">
+    <div class="empty-state">
+      <div class="icon">👥</div>
+      <p>Conéctate para ver<br>quién está en la sala</p>
+    </div>
+  </div>
+  <div class="join-form">
+    <div class="field-group">
+      <div class="field-label">NOMBRE</div>
+      <input class="fi" id="nameInput" placeholder="Tu nombre..." maxlength="16">
+    </div>
+    <div class="field-group">
+      <div class="field-label">SALA</div>
+      <input class="fi mono" id="roomInput" placeholder="squad1" maxlength="12">
+    </div>
+    <div class="field-group">
+      <div class="field-label">SERVIDOR</div>
+      <input class="fi mono" id="serverInput" placeholder="wss://..." value="wss://agiirischat.onrender.com">
+    </div>
+    <button class="jbtn" id="joinBtn" onclick="toggleJoin()">Conectar</button>
+  </div>
+</div>
+
+<!-- ── PHOTOS ── -->
+<div class="panel" id="panel-photos" style="flex-direction:column">
+  <div class="photos-topbar">
+    <button class="upload-btn" id="uploadBtn" disabled onclick="document.getElementById('photoFile').click()">
+      <span>📷</span> Subir foto
+    </button>
+    <input type="file" id="photoFile" accept="image/*" onchange="handlePhoto(event)">
+  </div>
+  <div class="photos-area" id="photosArea">
+    <div class="photos-empty" id="photosEmpty">
+      <div class="icon">📸</div>
+      <p>Sin fotos aún</p>
+      <span>Conecta y sube la primera</span>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLb()">
+  <button class="lb-close" onclick="closeLb()">✕</button>
+  <img id="lbImg" src="" alt="">
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let myName='', roomId='', myId=Math.random().toString(36).slice(2,9);
+let ws=null, connected=false, isTalking=false;
+let localStream=null, audioCtx=null, analyserNode=null;
+let peerConnections={}, remoteGains={};
+let members={}, levelRaf=null;
+let map=null, myMarker=null, myRadius=null, peerMarkers={};
+let locationInterval=null, locationActive=false;
+let photoBadge=0, chatBadge=0, activeTab='map';
+
+const RADIUS_MILES = 15;
+const RADIUS_METERS = RADIUS_MILES * 1609.34;
+
+const $=id=>document.getElementById(id);
+
+// ── Init map immediately ───────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  initMap();
+  // Try to get location right away for map center
+  if(navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const {latitude:lat, longitude:lng} = pos.coords;
+      map.setView([lat, lng], 12);
+      // Show radius preview (faded, not active yet)
+      showRadiusPreview(lat, lng);
+    }, () => {
+      // Default to center of PR if denied
+      map.setView([18.2208, -66.5901], 9);
+    });
+  }
+});
+
+function initMap() {
+  if(map) return;
+  map = L.map('map', { zoomControl: true, attributionControl: false })
+    .setView([18.4655, -66.1057], 10);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19
+  }).addTo(map);
+}
+
+function showRadiusPreview(lat, lng) {
+  if(myRadius) { map.removeLayer(myRadius); myRadius = null; }
+  myRadius = L.circle([lat, lng], {
+    radius: RADIUS_METERS,
+    color: '#ffffff',
+    fillColor: '#ffffff',
+    fillOpacity: 0.04,
+    weight: 1,
+    opacity: 0.2,
+    dashArray: '4 6'
+  }).addTo(map);
+}
+
+function showRadiusActive(lat, lng) {
+  if(myRadius) { map.removeLayer(myRadius); myRadius = null; }
+  myRadius = L.circle([lat, lng], {
+    radius: RADIUS_METERS,
+    color: '#4ade80',
+    fillColor: '#4ade80',
+    fillOpacity: 0.05,
+    weight: 1,
+    opacity: 0.4,
+    dashArray: '4 6'
+  }).addTo(map);
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  $('panel-'+tab).classList.add('active');
+  $('tab-'+tab).classList.add('active');
+  activeTab = tab;
+  if(tab==='photos') { photoBadge=0; $('badge-photos').classList.remove('show'); }
+  if(tab==='chat') { chatBadge=0; $('badge-chat').classList.remove('show'); }
+}
+
+// ── UI ─────────────────────────────────────────────────────────────────────
+function setConnected(val, connecting=false) {
+  connected = val;
+  $('cDot').className = 'conn-dot'+(connecting?' spin':val?' on':'');
+  $('cLabel').textContent = connecting?'conectando...':val?'en línea':'offline';
+  $('rLabel').style.display = val?'':'none';
+  $('pttBtn').disabled = !val;
+  $('chatInput').disabled = !val;
+  $('sendBtn').disabled = !val;
+  $('uploadBtn').disabled = !val;
+  $('locToggle').disabled = !val;
+  $('joinBtn').textContent = val?'Desconectar':connecting?'Conectando...':'Conectar';
+  $('joinBtn').className = val?'jbtn lv':'jbtn';
+  $('joinBtn').disabled = connecting;
+  ['nameInput','roomInput','serverInput'].forEach(id=>$(id).disabled=val||connecting);
+}
+
+function renderMembers() {
+  const list=$('membersList'), ids=Object.keys(members);
+  if(!ids.length) {
+    list.innerHTML='<div class="empty-state"><div class="icon">👥</div><p>Sala vacía</p></div>';
+    $('mapLegend').style.display='none';
+    return;
+  }
+  list.innerHTML = ids.map(id => {
+    const m=members[id], ini=m.name.slice(0,2).toUpperCase(), isSelf=id===myId;
+    return `<div class="member${m.speaking?' sp':''}">
+      <div class="m-av">${ini}</div>
+      <div class="m-info">
+        <div class="m-name">${m.name}${isSelf?' (tú)':''}</div>
+        <div class="m-status">${m.speaking?'hablando...':'en espera'}</div>
+      </div>
+      <div class="m-wave"><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div></div>
+    </div>`;
+  }).join('');
+
+  // Update map legend
+  $('mapLegend').style.display = '';
+  $('legendMembers').innerHTML = ids.map(id => {
+    const m=members[id], isSelf=id===myId;
+    return `<div class="legend-member${m.speaking?' sp':''}${isSelf?' me':''}">
+      <div class="legend-dot"></div>
+      ${m.name}${isSelf?' (tú)':''}
+    </div>`;
+  }).join('');
+}
+
+function addMsg(name, text, type='text') {
+  const area=$('chatArea'), now=new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+  const ini=name.slice(0,2).toUpperCase(), div=document.createElement('div');
+  if(type==='sys') {
+    div.className='msg sys';
+    div.innerHTML=`<span class="sys-text">${text}</span>`;
+  } else if(type==='voice') {
+    div.className='msg';
+    div.innerHTML=`<div class="msg-av">${ini}</div>
+      <div class="msg-body">
+        <div class="msg-meta"><span class="msg-name">${name}</span><span class="msg-time">${now}</span></div>
+        <span class="voice-badge">🎙 voz</span>
+      </div>`;
+  } else {
+    div.className='msg';
+    div.innerHTML=`<div class="msg-av">${ini}</div>
+      <div class="msg-body">
+        <div class="msg-meta"><span class="msg-name">${name}</span><span class="msg-time">${now}</span></div>
+        <div class="msg-text">${esc(text)}</div>
+      </div>`;
+  }
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+
+  if(type!=='sys' && activeTab!=='chat') {
+    chatBadge++;
+    const b=$('badge-chat');
+    b.textContent = chatBadge>9?'9+':chatBadge;
+    b.classList.add('show');
+  }
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── Photos ─────────────────────────────────────────────────────────────────
+function addPhoto(name, dataUrl, fromSelf=false) {
+  $('photosEmpty').style.display='none';
+  const now=new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+  const ini=name.slice(0,2).toUpperCase();
+  const card=document.createElement('div');
+  card.className='photo-card';
+  const safe=dataUrl.replace(/'/g,"\\'");
+  card.innerHTML=`<div class="photo-header">
+    <div class="photo-av">${ini}</div>
+    <span class="photo-name">${name}${fromSelf?' (tú)':''}</span>
+    <span class="photo-time">${now}</span>
+  </div>
+  <img class="photo-img" src="${dataUrl}" onclick="openLb('${safe}')">`;
+  $('photosArea').appendChild(card);
+  $('photosArea').scrollTop=$('photosArea').scrollHeight;
+  if(!fromSelf && activeTab!=='photos') {
+    photoBadge++;
+    const b=$('badge-photos');
+    b.textContent=photoBadge>9?'9+':photoBadge;
+    b.classList.add('show');
+  }
+}
+
+function handlePhoto(e) {
+  const file=e.target.files[0]; if(!file||!connected) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{ addPhoto(myName,ev.target.result,true); send({type:'photo',data:ev.target.result}); };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+
+function openLb(src){$('lbImg').src=src;$('lightbox').classList.add('open');}
+function closeLb(){$('lightbox').classList.remove('open');}
+
+// ── Location ───────────────────────────────────────────────────────────────
+function toggleLocation() {
+  if(!connected) return;
+  if(locationActive) {
+    locationActive=false;
+    clearInterval(locationInterval); locationInterval=null;
+    if(myMarker){map.removeLayer(myMarker);myMarker=null;}
+    showRadiusPreview_fromLastKnown();
+    $('locToggle').textContent='Activar';
+    $('locToggle').classList.remove('on');
+    $('locTitle').textContent='Ubicación desactivada';
+    $('locSub').textContent='Activa para compartir con tu squad';
+    send({type:'location',lat:null,lng:null});
+  } else {
+    locationActive=true;
+    $('locToggle').textContent='Desactivar';
+    $('locToggle').classList.add('on');
+    $('locTitle').textContent='Buscando GPS...';
+    $('locSub').textContent='';
+    sendLoc();
+    locationInterval=setInterval(sendLoc, 5000);
+  }
+}
+
+let lastKnownLat=null, lastKnownLng=null;
+
+function showRadiusPreview_fromLastKnown() {
+  if(lastKnownLat!==null) showRadiusPreview(lastKnownLat, lastKnownLng);
+}
+
+function sendLoc() {
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const{latitude:lat, longitude:lng}=pos.coords;
+    lastKnownLat=lat; lastKnownLng=lng;
+
+    showRadiusActive(lat, lng);
+
+    const icon=makeIcon(myName, true);
+    if(!myMarker) {
+      myMarker=L.marker([lat,lng],{icon}).addTo(map).bindPopup(`${myName} (tú)`);
+      map.setView([lat,lng], 13);
+    } else {
+      myMarker.setLatLng([lat,lng]);
+    }
+
+    $('locTitle').textContent='Compartiendo ubicación';
+    $('locSub').textContent=`${lat.toFixed(4)}, ${lng.toFixed(4)} · radio ${RADIUS_MILES}mi`;
+    send({type:'location',lat,lng});
+  }, err=>{
+    $('locTitle').textContent='Error de GPS';
+    $('locSub').textContent=err.message;
+  });
+}
+
+function updatePeerLoc(id, name, lat, lng) {
+  if(lat===null){
+    if(peerMarkers[id]){map.removeLayer(peerMarkers[id]);delete peerMarkers[id];}
+    return;
+  }
+  const icon=makeIcon(name, false);
+  if(!peerMarkers[id]) {
+    peerMarkers[id]=L.marker([lat,lng],{icon}).addTo(map).bindPopup(name);
+  } else {
+    peerMarkers[id].setLatLng([lat,lng]);
+  }
+}
+
+function makeIcon(name, self=false) {
+  const ini=name.slice(0,2).toUpperCase();
+  const color=self?'#ffffff':'#888888';
+  const bg=self?'#1a1a1a':'#222222';
+  const border=self?'#ffffff':'#444444';
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">
+    <circle cx="17" cy="17" r="15" fill="${bg}" stroke="${border}" stroke-width="1.5"/>
+    <text x="17" y="21" text-anchor="middle" font-family="DM Sans,sans-serif" font-weight="600" font-size="10" fill="${color}">${ini}</text>
+  </svg>`;
+  return L.divIcon({className:'',html:svg,iconSize:[34,34],iconAnchor:[17,17],popupAnchor:[0,-18]});
+}
+
+// ── Audio ──────────────────────────────────────────────────────────────────
+async function initAudio() {
+  if(localStream) return true;
+  try {
+    localStream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false
+    });
+    audioCtx=new AudioContext();
+    const src=audioCtx.createMediaStreamSource(localStream);
+    analyserNode=audioCtx.createAnalyser(); analyserNode.fftSize=256;
+    src.connect(analyserNode);
+    localStream.getAudioTracks().forEach(t=>t.enabled=false);
+    return true;
+  } catch(e) {addMsg('sistema','Micrófono no disponible','sys');return false;}
+}
+
+function startMeter() {
+  if(!analyserNode) return;
+  const bars=$('meter').children, data=new Uint8Array(analyserNode.frequencyBinCount);
+  function tick(){
+    analyserNode.getByteFrequencyData(data);
+    const n=data.slice(0,32).reduce((a,b)=>a+b,0)/32/255;
+    for(let i=0;i<bars.length;i++){
+      const on=n>i/bars.length;
+      bars[i].style.height=(on?4+n*14:4)+'px';
+      bars[i].className='mbar'+(on?' on':'');
+    }
+    levelRaf=requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function stopMeter(){
+  if(levelRaf) cancelAnimationFrame(levelRaf);
+  const bars=$('meter').children;
+  for(let b of bars){b.style.height='4px';b.className='mbar';}
+}
+
+function setDuck(duck){
+  if(!audioCtx) return;
+  Object.values(remoteGains).forEach(g=>g.gain.linearRampToValueAtTime(duck?.25:1,audioCtx.currentTime+.15));
+  $('duck').className='duck-note'+(duck?' on':'');
+  $('duck').textContent=duck?'🎵 Spotify al 25%':'🎵 Spotify sigue sonando mientras hablas';
+}
+
+// ── PTT ────────────────────────────────────────────────────────────────────
+async function startTalk(){
+  if(!connected||isTalking) return;
+  const ok=await initAudio(); if(!ok) return;
+  localStream.getAudioTracks().forEach(t=>t.enabled=true);
+  isTalking=true;
+  $('pttBtn').classList.add('active');
+  $('pttSub').textContent='Transmitiendo...';
+  $('pttSub').className='ptt-sub tx';
+  startMeter(); setDuck(true);
+  send({type:'speaking',speaking:true});
+  if(members[myId]){members[myId].speaking=true;renderMembers();}
+}
+
+function stopTalk(){
+  if(!isTalking) return;
+  if(localStream) localStream.getAudioTracks().forEach(t=>t.enabled=false);
+  isTalking=false;
+  $('pttBtn').classList.remove('active');
+  $('pttSub').textContent='Mantén pulsado · Spacebar';
+  $('pttSub').className='ptt-sub';
+  stopMeter(); setDuck(false);
+  send({type:'speaking',speaking:false});
+  if(members[myId]){members[myId].speaking=false;renderMembers();}
+  addMsg(myName,'','voice');
+}
+
+const pttBtn=$('pttBtn');
+pttBtn.addEventListener('mousedown',e=>{e.preventDefault();startTalk();});
+pttBtn.addEventListener('mouseup',stopTalk);
+pttBtn.addEventListener('mouseleave',stopTalk);
+pttBtn.addEventListener('touchstart',e=>{e.preventDefault();startTalk();},{passive:false});
+pttBtn.addEventListener('touchend',stopTalk);
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&!e.repeat&&!['chatInput','nameInput','roomInput','serverInput'].includes(document.activeElement?.id)){
+    e.preventDefault();startTalk();
+  }
+});
+document.addEventListener('keyup',e=>{if(e.code==='Space')stopTalk();});
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+function send(msg){if(ws&&ws.readyState===1)ws.send(JSON.stringify(msg));}
+
+async function onMsg(data){
+  switch(data.type){
+    case 'room_members':
+      for(const m of data.members){members[m.id]={name:m.name,speaking:false};await initAudio();await createOffer(m.id);}
+      renderMembers(); break;
+    case 'peer_joined':
+      members[data.id]={name:data.name,speaking:false};renderMembers();addMsg('sistema',`${data.name} se conectó`,'sys'); break;
+    case 'peer_left':
+      if(members[data.id]){addMsg('sistema',`${members[data.id].name} se desconectó`,'sys');delete members[data.id];renderMembers();}
+      closePeer(data.id);
+      if(peerMarkers[data.id]){map.removeLayer(peerMarkers[data.id]);delete peerMarkers[data.id];}
+      break;
+    case 'chat': addMsg(data.name,data.text); break;
+    case 'speaking': if(members[data.id]){members[data.id].speaking=data.speaking;renderMembers();} break;
+    case 'photo': addPhoto(data.name,data.data); break;
+    case 'location':
+      updatePeerLoc(data.id,data.name,data.lat,data.lng); break;
+    case 'offer': await initAudio();await handleOffer(data); break;
+    case 'answer': await handleAnswer(data); break;
+    case 'ice': await handleIce(data); break;
+  }
+}
+
+// ── WebRTC ─────────────────────────────────────────────────────────────────
+const ice={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
+
+function createPC(pid){
+  if(peerConnections[pid]) return peerConnections[pid];
+  const pc=new RTCPeerConnection(ice);
+  peerConnections[pid]=pc;
+  pc.onicecandidate=e=>{if(e.candidate)send({type:'ice',target:pid,candidate:e.candidate});};
+  pc.ontrack=e=>{
+    if(!audioCtx)audioCtx=new AudioContext();
+    const audio=new Audio(); audio.srcObject=e.streams[0]; audio.play().catch(()=>{});
+    const src=audioCtx.createMediaStreamSource(e.streams[0]);
+    const g=audioCtx.createGain(); g.gain.value=1;
+    src.connect(g); g.connect(audioCtx.destination);
+    remoteGains[pid]=g;
+  };
+  return pc;
+}
+
+async function createOffer(pid){
+  const pc=createPC(pid);
+  if(localStream) localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  const o=await pc.createOffer(); await pc.setLocalDescription(o);
+  send({type:'offer',target:pid,sdp:o});
+}
+async function handleOffer(d){
+  const pc=createPC(d.from);
+  if(localStream) localStream.getTracks().forEach(t=>{if(!pc.getSenders().find(s=>s.track===t))pc.addTrack(t,localStream);});
+  await pc.setRemoteDescription(new RTCSessionDescription(d.sdp));
+  const a=await pc.createAnswer(); await pc.setLocalDescription(a);
+  send({type:'answer',target:d.from,sdp:a});
+}
+async function handleAnswer(d){const pc=peerConnections[d.from];if(pc)await pc.setRemoteDescription(new RTCSessionDescription(d.sdp));}
+async function handleIce(d){const pc=peerConnections[d.from];if(pc&&d.candidate)try{await pc.addIceCandidate(new RTCIceCandidate(d.candidate));}catch{}}
+function closePeer(id){if(peerConnections[id]){peerConnections[id].close();delete peerConnections[id];}delete remoteGains[id];}
+
+// ── Join / Leave ───────────────────────────────────────────────────────────
+async function toggleJoin(){
+  if(connected){
+    if(locationActive) toggleLocation();
+    send({type:'leave'}); ws.close(); ws=null;
+    Object.keys(peerConnections).forEach(closePeer);
+    if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}
+    if(audioCtx){audioCtx.close();audioCtx=null;analyserNode=null;}
+    members={}; renderMembers(); stopMeter(); setConnected(false);
+    addMsg('sistema','desconectado','sys'); return;
+  }
+  myName=$('nameInput').value.trim()||'user_'+myId.slice(0,4);
+  roomId=$('roomInput').value.trim().toLowerCase()||'squad1';
+  const srv=$('serverInput').value.trim()||'wss://agiirischat.onrender.com';
+  $('nameInput').value=myName; $('roomInput').value=roomId;
+  $('rLabel').textContent='· '+roomId;
+  setConnected(false,true);
+  try{ws=new WebSocket(srv);}catch{addMsg('sistema','URL inválida','sys');setConnected(false);return;}
+  ws.onopen=async()=>{
+    await initAudio();
+    members[myId]={name:myName,speaking:false};
+    renderMembers(); setConnected(true);
+    send({type:'join',id:myId,name:myName,room:roomId});
+    addMsg('sistema',`conectado a "${roomId}" como ${myName}`,'sys');
+  };
+  ws.onmessage=e=>{try{onMsg(JSON.parse(e.data));}catch{}};
+  ws.onerror=()=>{addMsg('sistema','error de conexión','sys');setConnected(false);};
+  ws.onclose=()=>{if(connected){addMsg('sistema','conexión perdida','sys');members={};renderMembers();setConnected(false);}};
+}
+
+function sendMsg(){
+  const input=$('chatInput'), text=input.value.trim();
+  if(!text||!connected) return;
+  input.value=''; addMsg(myName,text); send({type:'chat',text});
+}
+</script>
+</body>
+</html>
