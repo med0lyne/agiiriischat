@@ -176,7 +176,33 @@ header{
 .map-hint.hidden{opacity:0;}
 
 /* Meter */
-.map-meter{position:absolute;top:12px;right:12px;display:flex;gap:2px;align-items:flex-end;height:18px;pointer-events:none;}
+.map-meter{position:absolute;top:12px;right:60px;display:flex;gap:2px;align-items:flex-end;height:18px;pointer-events:none;}
+.mmbar{width:4px;background:rgba(255,255,255,0.08);border-radius:2px;transition:height .05s,background .05s;}
+.mmbar.on{background:var(--purple);box-shadow:0 0 4px var(--purple);}
+
+/* Recenter button */
+.recenter-btn{
+  position:absolute;
+  bottom:calc(90px + env(safe-area-inset-bottom,0px));
+  left:50%;
+  transform:translateX(-50%) translateY(8px);
+  z-index:600;pointer-events:all;
+  background:rgba(8,8,26,0.92);
+  border:1px solid rgba(167,139,250,0.35);
+  border-radius:24px;
+  padding:9px 18px;
+  display:flex;align-items:center;gap:8px;
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;
+  color:var(--purple);
+  cursor:pointer;
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);
+  opacity:0;
+  transition:opacity .25s,transform .25s;
+  white-space:nowrap;
+}
+.recenter-btn.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.recenter-btn:active{transform:translateX(-50%) scale(0.96);}
 .mmbar{width:4px;background:rgba(255,255,255,0.08);border-radius:2px;transition:height .05s,background .05s;}
 .mmbar.on{background:var(--purple);box-shadow:0 0 4px var(--purple);}
 
@@ -310,8 +336,27 @@ header{
 
 .squad-empty{padding:24px 16px;text-align:center;color:var(--text3);font-size:12px;line-height:1.6;}
 
-/* Meter moves left when squad btn visible */
-.map-meter{right:60px;}
+/* Recenter button */
+.recenter-btn{
+  position:absolute;
+  bottom:calc(90px + env(safe-area-inset-bottom,0px));
+  right:12px;
+  z-index:600;
+  width:42px;height:42px;border-radius:50%;
+  background:rgba(8,8,26,0.88);
+  border:1px solid rgba(167,139,250,0.3);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  font-size:18px;
+  pointer-events:all;
+  opacity:0;transform:scale(0.8);
+  transition:opacity .25s,transform .25s;
+  box-shadow:0 4px 16px rgba(0,0,0,0.3);
+}
+.recenter-btn.show{opacity:1;transform:scale(1);}
+.recenter-btn:active{transform:scale(0.92);}
+
 background:rgba(8,8,26,0.9)!important;color:var(--purple)!important;border-color:rgba(167,139,250,0.2)!important;}
 .leaflet-control-zoom a:hover{background:rgba(167,139,250,0.1)!important;}
 .leaflet-control-attribution{display:none;}
@@ -482,6 +527,9 @@ background:rgba(8,8,26,0.9)!important;color:var(--purple)!important;border-color
         <div class="ptt-circle"><span style="font-size:26px">🎙</span><div class="ptt-tx">TX</div></div>
       </div>
       <div class="map-hint" id="mapHint">MANTÉN 0.5s PARA HABLAR</div>
+      <button class="recenter-btn" id="recenterBtn" onclick="recenterMap()">
+        📍 Volver a mi ubicación
+      </button>
       <div class="map-meter" id="mapMeter">
         <div class="mmbar" style="height:4px"></div><div class="mmbar" style="height:4px"></div>
         <div class="mmbar" style="height:4px"></div><div class="mmbar" style="height:4px"></div>
@@ -634,6 +682,8 @@ function initMap(){
   setTimeout(()=>map.invalidateSize(),100);
   setTimeout(()=>map.invalidateSize(),800);
   attachMapPTT();
+  // Show recenter button when user pans away
+  map.on('moveend',()=>{ if(locationActive)checkRecenter(); });
 }
 window.addEventListener('load',()=>{
   initMap();
@@ -766,6 +816,7 @@ function toggleLocation(){
     locationActive=false;
     if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
     if(myMarker){map.removeLayer(myMarker);myMarker=null;}
+    myLatLng=null; hideRecenter();
     $('locBtn').textContent='Activar';$('locBtn').classList.remove('on');
     $('locTitle').textContent='Ubicación desactivada';$('locSub').textContent='Activa para compartir';
     send({type:'location',lat:null,lng:null});
@@ -778,12 +829,43 @@ function toggleLocation(){
   }
 }
 let _lastSent=0;
+let myLatLng=null; // track my position without auto-panning
+
 function onLocUpdate(lat,lng){
+  myLatLng={lat,lng};
   const icon=makeIcon(myName,true);
-  if(!myMarker){myMarker=L.marker([lat,lng],{icon,zIndexOffset:1000}).addTo(map).bindPopup(`${myName} (tú)`);map.setView([lat,lng],17);}
-  else{myMarker.setLatLng([lat,lng]);map.panTo([lat,lng],{animate:true,duration:0.4});}
-  $('locTitle').textContent='Compartiendo ubicación';$('locSub').textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  if(!myMarker){
+    // First time — fly to location
+    myMarker=L.marker([lat,lng],{icon,zIndexOffset:1000}).addTo(map).bindPopup(`${myName} (tú)`);
+    map.setView([lat,lng],17);
+    hideRecenter();
+  } else {
+    // Just update marker position, no auto-pan
+    myMarker.setLatLng([lat,lng]);
+    // Show recenter button if map center is far from user
+    checkRecenter();
+  }
+  $('locTitle').textContent='Compartiendo ubicación';
+  $('locSub').textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   const now=Date.now();if(now-_lastSent>3000){_lastSent=now;send({type:'location',lat,lng});}
+}
+
+function checkRecenter(){
+  if(!myLatLng||!map)return;
+  const center=map.getCenter();
+  const dist=map.distance(center,[myLatLng.lat,myLatLng.lng]);
+  // Show button if more than 80m away from user
+  if(dist>80) showRecenter();
+  else hideRecenter();
+}
+
+function showRecenter(){ $('recenterBtn').classList.add('show'); }
+function hideRecenter(){ $('recenterBtn').classList.remove('show'); }
+
+function recenterMap(){
+  if(!myLatLng||!map)return;
+  map.flyTo([myLatLng.lat,myLatLng.lng],17,{animate:true,duration:1});
+  hideRecenter();
 }
 function updatePeerLoc(id,name,lat,lng){
   if(lat===null){
