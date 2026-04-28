@@ -146,9 +146,9 @@ MAP
 .map-wrap { position: absolute; inset: 0; }
 #map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-/* No filter needed - Stadia dark tiles already match the UI */
+/* CartoDB Dark Matter already matches the UI — slight purple tint */
 .leaflet-tile-pane {
-filter: brightness(0.9) saturate(1.1);
+filter: brightness(0.85) hue-rotate(220deg) saturate(0.7);
 }
 
 /* All overlays pointer-events:none except HUD buttons */
@@ -717,9 +717,9 @@ const HOLD_MS=500,CIRCUMFERENCE=220;
 function initMap(){
   if(map)return;
   map=L.map('map',{zoomControl:true,attributionControl:false,tap:false,dragging:true,touchZoom:true,doubleClickZoom:false,scrollWheelZoom:true}).setView([18.4655,-66.1057],17);
-  L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',{
-    maxZoom:20,
-    attribution:'&copy; Stadia Maps'
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    maxZoom:19,
+    subdomains:'abcd'
   }).addTo(map);
   setTimeout(()=>map.invalidateSize(),100);
   setTimeout(()=>map.invalidateSize(),800);
