@@ -383,7 +383,7 @@ body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:50%;height:50
 <div class="screen" id="screen-map">
   <div class="hdr">
     <div class="hdr-logo">AGIIRISCHAT</div>
-    <div class="hdr-pill">
+    <div class="hdr-pill" onclick="if(connected)openRoomPicker()" style="cursor:pointer;">
       <div class="hdot" id="connDot"></div>
       <span id="connLabel">offline</span>
       <span id="connRoom" style="display:none;opacity:.5;margin-left:2px"></span>
@@ -546,7 +546,25 @@ body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:50%;height:50
 </div>
 
 <!-- ══ MODALS ══ -->
-<!-- Create/Join Crew -->
+<!-- Room picker modal -->
+<div class="modal-overlay" id="roomModal" style="z-index:9500;">
+  <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Unirse a una sala</div>
+    <div class="modal-sub">Crea una nueva o entra a una existente</div>
+    <!-- active rooms list -->
+    <div id="roomsList" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;"></div>
+    <!-- divider -->
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">O</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+    <input class="modal-input" id="roomNameInput" placeholder="Nombre de sala nueva..." maxlength="20" style="font-family:'DM Mono',monospace;text-transform:lowercase;" onkeydown="if(event.key==='Enter')joinRoomFromModal()">
+    <div class="modal-error" id="roomModalError"></div>
+    <button class="modal-btn-p" onclick="joinRoomFromModal()">Entrar →</button>
+  </div>
+</div>
 <div class="modal-overlay" id="crewModal">
   <div class="modal-sheet" onclick="e=>e.stopPropagation()">
     <div class="modal-handle"></div>
@@ -668,6 +686,8 @@ async function init() {
     showScreen('map');
     await loadCrew();
     loadFeed();
+    // Show room picker after connecting
+    setTimeout(() => openRoomPicker(), 400);
   } else {
     hideLoading();
     showScreen('auth');
@@ -714,7 +734,7 @@ async function handleAuth() {
   showScreen('map');
   await loadCrew();
   loadFeed();
-}
+  setTimeout(() => openRoomPicker(), 400);
 
 async function loadProfile() {
   const { data } = await sb.from('profiles').select('*').eq('id', user.id).single();
@@ -1239,6 +1259,8 @@ document.addEventListener('keyup', e => { if (e.code==='Space') stopTalk(); });
 // ── WebSocket ─────────────────────────────────────────────────
 function send(msg) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 
+let currentRoom = null;
+
 async function connectWS() {
   return new Promise(resolve => {
     try { ws = new WebSocket(WS_URL); } catch { resolve(false); return; }
@@ -1246,26 +1268,90 @@ async function connectWS() {
     ws.onopen = async () => {
       clearTimeout(timeout);
       await initAudio();
-      const myPeerId = user?.id || Math.random().toString(36).slice(2);
-      const roomId = profile?.crew_id || 'lobby';
-      const name = profile?.username || 'usuario';
-      members[myPeerId] = { name, speaking: false };
       setConnected(true);
-      send({ type: 'join', id: myPeerId, name, room: roomId });
-      $('connRoom').textContent = '· ' + roomId; $('connRoom').style.display = '';
-      addMsg('sistema', `conectado como ${name}`, 'sys');
+      // Don't auto-join any room — show picker
       resolve(true);
     };
     ws.onmessage = e => { try { onMsg(JSON.parse(e.data)); } catch {} };
     ws.onerror = () => { clearTimeout(timeout); resolve(false); };
-    ws.onclose = () => { if (connected) { setConnected(false); addMsg('sistema','conexión perdida','sys'); } };
+    ws.onclose = () => { if (connected) { setConnected(false); currentRoom = null; addMsg('sistema','conexión perdida','sys'); } };
   });
+}
+
+function joinRoom(roomName) {
+  if (!roomName) return;
+  // Leave current room first
+  if (currentRoom) send({ type: 'leave' });
+  // Clear old members
+  Object.keys(peerConnections).forEach(closePeer);
+  members = {};
+  currentRoom = roomName.toLowerCase().trim();
+  const myPeerId = user?.id || Math.random().toString(36).slice(2);
+  const name = profile?.username || 'usuario';
+  if (!members[myPeerId]) members[myPeerId] = { name, speaking: false };
+  send({ type: 'join', id: myPeerId, name, room: currentRoom });
+  $('connRoom').textContent = '· ' + currentRoom;
+  $('connRoom').style.display = '';
+  addMsg('sistema', `entraste a "${currentRoom}"`, 'sys');
+  renderMembersUI();
+}
+
+async function openRoomPicker() {
+  $('roomNameInput').value = '';
+  $('roomModalError').textContent = '';
+  // Load active rooms from server
+  await loadActiveRooms();
+  openModal('roomModal');
+  setTimeout(() => $('roomNameInput').focus(), 300);
+}
+
+async function loadActiveRooms() {
+  const list = $('roomsList');
+  list.innerHTML = '<div style="font-size:11px;color:var(--text3);padding:4px 2px;font-family:\'DM Mono\',monospace;letter-spacing:.08em;">SALAS ACTIVAS</div>';
+  // Ask server for active rooms
+  send({ type: 'list_rooms' });
+  // Will be populated by server response
+}
+
+function renderActiveRooms(rooms) {
+  const list = $('roomsList');
+  if (!rooms?.length) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px 2px;">No hay salas activas — crea la primera</div>';
+    return;
+  }
+  const current = currentRoom;
+  list.innerHTML = '<div style="font-size:10px;color:var(--text3);padding:4px 2px;font-family:\'DM Mono\',monospace;letter-spacing:.08em;margin-bottom:2px;">SALAS ACTIVAS</div>' +
+    rooms.map(r => `
+      <div onclick="pickRoom('${r.name}')" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:${r.name===current?'rgba(167,139,250,0.12)':'rgba(255,255,255,0.04)'};border:1px solid ${r.name===current?'rgba(167,139,250,0.3)':'var(--border)'};border-radius:var(--rsm);cursor:pointer;transition:all .15s;">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);font-family:'DM Mono',monospace;">${r.name}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px;">${r.count} ${r.count===1?'persona':'personas'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${r.name===current?'<span style="font-size:10px;color:var(--purple);background:rgba(167,139,250,0.1);padding:2px 8px;border-radius:10px;border:1px solid rgba(167,139,250,0.2);">actual</span>':''}
+          <span style="color:var(--text3);font-size:16px;">→</span>
+        </div>
+      </div>`).join('');
+}
+
+function pickRoom(name) {
+  $('roomNameInput').value = name;
+  joinRoomFromModal();
+}
+
+function joinRoomFromModal() {
+  const name = $('roomNameInput').value.trim().toLowerCase();
+  if (!name) { $('roomModalError').textContent = 'Escribe un nombre de sala'; return; }
+  if (!/^[a-z0-9_-]+$/.test(name)) { $('roomModalError').textContent = 'Solo letras, números, guiones'; return; }
+  closeModal('roomModal');
+  joinRoom(name);
 }
 
 function setConnected(val) {
   connected = val;
   $('connDot').className = 'hdot' + (val ? ' on' : '');
   $('connLabel').textContent = val ? 'en línea' : 'offline';
+  if (!val) { $('connRoom').style.display = 'none'; currentRoom = null; }
   $('pttBtn').disabled = !val; $('chatInput').disabled = !val; $('sendBtn').disabled = !val;
   $('locBtn').disabled = !val;
 }
@@ -1286,6 +1372,7 @@ function updateSpeakingIndicator() {
 
 async function onMsg(data) {
   switch (data.type) {
+    case 'rooms_list': renderActiveRooms(data.rooms); break;
     case 'room_members':
       for (const m of data.members) { if (!members[m.id]) members[m.id] = { name: m.name, speaking: false }; await initAudio(); await createOffer(m.id); }
       renderMembersUI(); break;
