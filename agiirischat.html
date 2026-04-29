@@ -383,7 +383,7 @@ body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:50%;height:50
 <div class="screen" id="screen-map">
   <div class="hdr">
     <div class="hdr-logo">AGIIRISCHAT</div>
-    <div class="hdr-pill" onclick="if(connected)openRoomPicker()" style="cursor:pointer;">
+    <div class="hdr-pill" onclick="openRoomPicker()" style="cursor:pointer;">
       <div class="hdot" id="connDot"></div>
       <span id="connLabel">offline</span>
       <span id="connRoom" style="display:none;opacity:.5;margin-left:2px"></span>
@@ -557,12 +557,16 @@ body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:50%;height:50
     <!-- divider -->
     <div style="display:flex;align-items:center;gap:10px;">
       <div style="flex:1;height:1px;background:var(--border)"></div>
-      <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">O</span>
+      <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">O CREA UNA</span>
       <div style="flex:1;height:1px;background:var(--border)"></div>
     </div>
     <input class="modal-input" id="roomNameInput" placeholder="Nombre de sala nueva..." maxlength="20" style="font-family:'DM Mono',monospace;text-transform:lowercase;" onkeydown="if(event.key==='Enter')joinRoomFromModal()">
     <div class="modal-error" id="roomModalError"></div>
-    <button class="modal-btn-p" onclick="joinRoomFromModal()">Entrar →</button>
+    <button class="modal-btn-p" onclick="joinRoomFromModal()">Entrar a sala →</button>
+    <button class="modal-btn-s" onclick="closeModal('roomModal')">Ahora no — solo explorar</button>
+    <div id="leaveRoomBtn" style="display:none">
+      <button class="modal-btn-s" style="color:var(--red);border-color:rgba(248,113,113,0.2);" onclick="leaveRoom()">Salir de sala actual</button>
+    </div>
   </div>
 </div>
 <div class="modal-overlay" id="crewModal">
@@ -1287,9 +1291,7 @@ async function connectWS() {
 
 function joinRoom(roomName) {
   if (!roomName) return;
-  // Leave current room first
   if (currentRoom) send({ type: 'leave' });
-  // Clear old members
   Object.keys(peerConnections).forEach(closePeer);
   members = {};
   currentRoom = roomName.toLowerCase().trim();
@@ -1297,8 +1299,7 @@ function joinRoom(roomName) {
   const name = profile?.username || 'usuario';
   if (!members[myPeerId]) members[myPeerId] = { name, speaking: false };
   send({ type: 'join', id: myPeerId, name, room: currentRoom });
-  $('connRoom').textContent = '· ' + currentRoom;
-  $('connRoom').style.display = '';
+  updateRoomUI();
   addMsg('sistema', `entraste a "${currentRoom}"`, 'sys');
   renderMembersUI();
 }
@@ -1306,7 +1307,7 @@ function joinRoom(roomName) {
 async function openRoomPicker() {
   $('roomNameInput').value = '';
   $('roomModalError').textContent = '';
-  // Load active rooms from server
+  $('leaveRoomBtn').style.display = currentRoom ? '' : 'none';
   await loadActiveRooms();
   openModal('roomModal');
   setTimeout(() => $('roomNameInput').focus(), 300);
@@ -1354,13 +1355,53 @@ function joinRoomFromModal() {
   joinRoom(name);
 }
 
+function leaveRoom() {
+  if (!currentRoom) return;
+  send({ type: 'leave' });
+  Object.keys(peerConnections).forEach(closePeer);
+  members = {};
+  currentRoom = null;
+  addMsg('sistema', 'saliste de la sala', 'sys');
+  updateRoomUI();
+  renderMembersUI();
+  closeModal('roomModal');
+}
+
 function setConnected(val) {
   connected = val;
   $('connDot').className = 'hdot' + (val ? ' on' : '');
-  $('connLabel').textContent = val ? 'en línea' : 'offline';
-  if (!val) { $('connRoom').style.display = 'none'; currentRoom = null; }
-  $('pttBtn').disabled = !val; $('chatInput').disabled = !val; $('sendBtn').disabled = !val;
+  if (!val) {
+    $('connLabel').textContent = 'offline';
+    $('connRoom').style.display = 'none';
+    currentRoom = null;
+    updateRoomUI();
+  } else {
+    $('connLabel').textContent = 'en línea';
+    updateRoomUI();
+  }
   $('locBtn').disabled = !val;
+}
+
+function updateRoomUI() {
+  const inRoom = connected && currentRoom;
+  // PTT only works in a room
+  $('pttBtn').disabled = !inRoom;
+  $('chatInput').disabled = !inRoom;
+  $('sendBtn').disabled = !inRoom;
+  $('uploadBtn') && ($('uploadBtn').disabled = !inRoom);
+  // Update header pill
+  if (!connected) {
+    $('connRoom').style.display = 'none';
+  } else if (currentRoom) {
+    $('connRoom').textContent = '· ' + currentRoom;
+    $('connRoom').style.display = '';
+  } else {
+    $('connRoom').textContent = '· toca para entrar a sala';
+    $('connRoom').style.display = '';
+    $('connRoom').style.opacity = '.35';
+  }
+  // Update chat header
+  $('chatOnlineCount') && ($('chatOnlineCount').textContent = inRoom ? `● ${Object.keys(members).length} en sala` : '● sin sala — toca el header para unirte');
 }
 
 function renderMembersUI() {
