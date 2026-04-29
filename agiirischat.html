@@ -679,15 +679,21 @@ async function init() {
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
     user = session.user;
+    setLoadingText('CARGANDO PERFIL...');
     await loadProfile();
     hideLoading();
     initMap();
-    await connectWS();
     showScreen('map');
     await loadCrew();
     loadFeed();
-    // Show room picker after connecting
-    setTimeout(() => openRoomPicker(), 400);
+    // Connect WS in background — don't block UI
+    connectWS().then(() => {
+      if (connected) setTimeout(() => openRoomPicker(), 400);
+    });
+  } else {
+    hideLoading();
+    showScreen('auth');
+  }
   } else {
     hideLoading();
     showScreen('auth');
@@ -730,11 +736,13 @@ async function handleAuth() {
   $('authBtn').disabled = false;
   await loadProfile();
   initMap();
-  await connectWS();
   showScreen('map');
   await loadCrew();
   loadFeed();
-  setTimeout(() => openRoomPicker(), 400);
+  connectWS().then(() => {
+    if (connected) setTimeout(() => openRoomPicker(), 400);
+  });
+}
 
 async function loadProfile() {
   const { data } = await sb.from('profiles').select('*').eq('id', user.id).single();
@@ -1264,16 +1272,19 @@ let currentRoom = null;
 async function connectWS() {
   return new Promise(resolve => {
     try { ws = new WebSocket(WS_URL); } catch { resolve(false); return; }
-    const timeout = setTimeout(() => { resolve(false); }, 8000);
+    const timeout = setTimeout(() => {
+      // Timeout — still resolve true so app loads, WS will retry on reconnect
+      setConnected(false);
+      resolve(true);
+    }, 12000);
     ws.onopen = async () => {
       clearTimeout(timeout);
       await initAudio();
       setConnected(true);
-      // Don't auto-join any room — show picker
       resolve(true);
     };
     ws.onmessage = e => { try { onMsg(JSON.parse(e.data)); } catch {} };
-    ws.onerror = () => { clearTimeout(timeout); resolve(false); };
+    ws.onerror = () => { clearTimeout(timeout); setConnected(false); resolve(true); };
     ws.onclose = () => { if (connected) { setConnected(false); currentRoom = null; addMsg('sistema','conexión perdida','sys'); } };
   });
 }
